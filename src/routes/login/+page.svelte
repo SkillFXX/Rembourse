@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { LogIn, KeyRound, User as UserIcon, AlertCircle, Sparkles } from 'lucide-svelte';
+	import { LogIn, KeyRound, User as UserIcon, AlertCircle } from 'lucide-svelte';
 
 	let { data } = $props();
 
@@ -110,32 +110,6 @@
 			<span style="font-size: 0.85rem; color: #64748b; display: block; margin-top: 0.25rem;">
 				🔒 Inscription par <strong>invitation uniquement</strong>. Demandez un lien à un ami déjà inscrit !
 			</span>
-		</div>
-	</div>
-
-	<!-- Demo Switcher Card: Easy 1-click test for evaluators -->
-	<div class="card" style="background: #fffdf5; border: 1.5px dashed var(--color-primary); padding: 1.25rem;">
-		<div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; color: var(--color-dark);">
-			<Sparkles size={18} color="#fdc619" />
-			<span style="font-weight: 800; font-size: 0.9rem;">Accès Rapide Test & Démo :</span>
-		</div>
-		<p style="font-size: 0.82rem; color: #64748b; margin-bottom: 0.75rem;">
-			Pour tester immédiatement les flux de validation entre amis sans ressaisir les identifiants :
-		</p>
-		<div style="display: flex; flex-direction: column; gap: 0.5rem;">
-			{#each data.demoUsers as u}
-				<form action="/api/auth/switch" method="POST">
-					<input type="hidden" name="userId" value={u.id} />
-					<button
-						type="submit"
-						class="btn btn-outline btn-sm"
-						style="width: 100%; justify-content: flex-start; background: #ffffff;"
-					>
-						<span style="font-weight: 800; color: var(--color-dark);">{u.full_name}</span>
-						<span style="color: #64748b; margin-left: auto; font-size: 0.75rem;">(@{u.username})</span>
-					</button>
-				</form>
-			{/each}
 		</div>
 	</div>
 </div>

@@ -15,7 +15,6 @@
 		Share2,
 		LogOut,
 		PlusCircle,
-		UserCheck,
 		X,
 		KeyRound,
 		ChevronDown,
@@ -27,7 +26,6 @@
 	let { data, children } = $props();
 
 	let showUserMenu = $state(false);
-	let showQuickSwitchModal = $state(false);
 	let showInviteModal = $state(false);
 	let generatedInviteUrl = $state('');
 	let inviteLoading = $state(false);
@@ -263,19 +261,6 @@
 									<span>Inviter un ami</span>
 								</button>
 
-								<button
-									type="button"
-									class="dropdown-item"
-									style="width: 100%; border: none; background: none; text-align: left; cursor: pointer;"
-									onclick={() => {
-										showUserMenu = false;
-										showQuickSwitchModal = true;
-									}}
-								>
-									<UserCheck size={16} />
-									<span>Changer d'utilisateur (Test)</span>
-								</button>
-
 								<form
 									action="/api/auth/logout"
 									method="POST"
@@ -465,69 +450,6 @@
 			</div>
 			<div class="modal-footer">
 				<button class="btn btn-dark" onclick={() => (showInviteModal = false)}>Fermer</button>
-			</div>
-		</div>
-	</div>
-{/if}
-
-<!-- Modal Changement Rapide d'Utilisateur (Super pratique pour tester les validations réciproques) -->
-{#if showQuickSwitchModal}
-	<div
-		class="modal-overlay"
-		role="dialog"
-		aria-modal="true"
-		tabindex="-1"
-		onclick={(e) => {
-			if (e.target === e.currentTarget) showQuickSwitchModal = false;
-		}}
-		onkeydown={(e) => {
-			if (e.key === 'Escape') showQuickSwitchModal = false;
-		}}
-	>
-		<div class="modal-content">
-			<div class="modal-header">
-				<h3 style="font-size: 1.25rem; color: var(--color-dark); display: flex; align-items: center; gap: 0.5rem;">
-					<UserCheck size={20} color="#fdc619" />
-					Changer d'utilisateur (Test)
-				</h3>
-				<button class="btn btn-outline btn-icon" onclick={() => (showQuickSwitchModal = false)}>
-					<X size={18} />
-				</button>
-			</div>
-			<div class="modal-body">
-				<p style="color: var(--color-text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
-					Basculez instantanément sur un autre compte pour tester le système de validation / contestation mutuel :
-				</p>
-				<div style="display: flex; flex-direction: column; gap: 0.75rem;">
-					{#each data.allUsers as u}
-						<form action="/api/auth/switch" method="POST" style="width: 100%;">
-							<input type="hidden" name="userId" value={u.id} />
-							<button
-								type="submit"
-								class="btn btn-outline"
-								style="width: 100%; justify-content: space-between; padding: 0.75rem 1rem; {data.user?.id === u.id ? 'border: 2px solid var(--color-primary); background-color: var(--color-primary-light);' : ''}"
-							>
-								<div style="display: flex; align-items: center; gap: 0.75rem;">
-									<div
-										style="width: 34px; height: 34px; border-radius: 9999px; background: #0e2331; color: #fdc619; display: flex; align-items: center; justify-content: center; font-weight: 800; font-family: var(--font-title);"
-									>
-										{u.full_name[0]}
-									</div>
-									<div style="text-align: left;">
-										<div style="font-weight: 800; color: var(--color-dark);">{u.full_name}</div>
-										<div style="font-size: 0.8rem; color: #64748b;">@{u.username} ({u.role})</div>
-									</div>
-								</div>
-								{#if data.user?.id === u.id}
-									<span class="badge badge-approved" style="font-size: 0.7rem;">Actif</span>
-								{/if}
-							</button>
-						</form>
-					{/each}
-				</div>
-			</div>
-			<div class="modal-footer">
-				<button class="btn btn-outline" onclick={() => (showQuickSwitchModal = false)}>Fermer</button>
 			</div>
 		</div>
 	</div>
