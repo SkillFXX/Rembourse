@@ -13,3 +13,4 @@ export const POST: RequestHandler = async ({ locals }) => {
 		inviteUrl: `/register?invite=${invitation.code}`
 	});
 };
+

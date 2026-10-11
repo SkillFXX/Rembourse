@@ -43,3 +43,4 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		inviterName: invite.creator_name || 'Un ami'
 	};
 };
+

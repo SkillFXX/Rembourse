@@ -9,3 +9,4 @@ export const POST: RequestHandler = async ({ cookies }) => {
 	}
 	throw redirect(303, '/login');
 };
+

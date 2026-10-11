@@ -1111,3 +1111,4 @@ export function logAudit(userId: number, action: string, entityType: string, ent
     VALUES (?, ?, ?, ?, ?)
   `).run(userId, action, entityType, entityId, details);
 }
+

@@ -23,3 +23,4 @@ export const POST: RequestHandler = async ({ locals }) => {
 	markNotificationsRead(locals.user.id);
 	return json({ success: true });
 };
+

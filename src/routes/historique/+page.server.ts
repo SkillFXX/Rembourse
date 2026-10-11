@@ -20,3 +20,4 @@ export const load: PageServerLoad = async ({ locals }) => {
 		friends
 	};
 };
+
