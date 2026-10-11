@@ -17,3 +17,4 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     return json({ error: err.message || 'Erreur interne' }, { status: 500 });
   }
 };
+

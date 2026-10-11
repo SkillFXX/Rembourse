@@ -6,3 +6,4 @@ export const GET: RequestHandler = async () => {
   const publicKey = getVapidPublicKey();
   return json({ publicKey });
 };
+
