@@ -64,3 +64,4 @@ export const actions: Actions = {
 		return { inviteSuccess: true, newInviteCode: invite.code };
 	}
 };
+

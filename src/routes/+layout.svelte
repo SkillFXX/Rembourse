@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '../app.css';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { requestNotificationPermission, sendLocalNotification } from '$lib/notifications';
 	import {
@@ -14,7 +14,8 @@
 		PlusCircle,
 		UserCheck,
 		Menu,
-		X
+		X,
+		KeyRound
 	} from 'lucide-svelte';
 
 	let { data, children } = $props();
@@ -24,7 +25,7 @@
 	let generatedInviteUrl = $state('');
 	let inviteLoading = $state(false);
 	let copied = $state(false);
-	let lastPendingCount = $state(data.pendingCount || 0);
+	let lastPendingCount = $state(0);
 
 	async function generateInvite() {
 		inviteLoading = true;
@@ -94,14 +95,14 @@
 
 				<!-- Desktop Nav -->
 				<nav class="desktop-nav">
-					<a href="/" class="desktop-nav-link" class:active={$page.url.pathname === '/'}>
+					<a href="/" class="desktop-nav-link" class:active={page.url.pathname === '/'}>
 						<Home size={18} />
 						<span>Tableau de bord</span>
 					</a>
 					<a
 						href="/validations"
 						class="desktop-nav-link"
-						class:active={$page.url.pathname === '/validations'}
+						class:active={page.url.pathname === '/validations'}
 					>
 						<CheckSquare size={18} />
 						<span>À valider</span>
@@ -114,7 +115,7 @@
 					<a
 						href="/historique"
 						class="desktop-nav-link"
-						class:active={$page.url.pathname === '/historique'}
+						class:active={page.url.pathname === '/historique'}
 					>
 						<History size={18} />
 						<span>Historique</span>
@@ -122,7 +123,7 @@
 					<a
 						href="/amis"
 						class="desktop-nav-link"
-						class:active={$page.url.pathname === '/amis'}
+						class:active={page.url.pathname === '/amis'}
 					>
 						<Users size={18} />
 						<span>Amis</span>
@@ -130,7 +131,7 @@
 					<a
 						href="/invitations"
 						class="desktop-nav-link"
-						class:active={$page.url.pathname === '/invitations'}
+						class:active={page.url.pathname === '/invitations'}
 					>
 						<Share2 size={18} />
 						<span>Invitations</span>
@@ -138,7 +139,7 @@
 					<a
 						href="/profil"
 						class="desktop-nav-link"
-						class:active={$page.url.pathname === '/profil'}
+						class:active={page.url.pathname === '/profil'}
 					>
 						<KeyRound size={18} />
 						<span>Profil & Sécurité</span>
@@ -195,14 +196,14 @@
 	{#if data.user}
 		<!-- Mobile Bottom Nav -->
 		<nav class="bottom-nav">
-			<a href="/" class="nav-item" class:active={$page.url.pathname === '/'}>
+			<a href="/" class="nav-item" class:active={page.url.pathname === '/'}>
 				<Home size={22} class="nav-icon" />
 				<span>Accueil</span>
 			</a>
 			<a
 				href="/validations"
 				class="nav-item"
-				class:active={$page.url.pathname === '/validations'}
+				class:active={page.url.pathname === '/validations'}
 			>
 				<CheckSquare size={22} class="nav-icon" />
 				<span>À valider</span>
@@ -223,7 +224,7 @@
 			<a
 				href="/invitations"
 				class="nav-item"
-				class:active={$page.url.pathname === '/invitations'}
+				class:active={page.url.pathname === '/invitations'}
 			>
 				<Share2 size={22} class="nav-icon" />
 				<span>Inviter</span>
@@ -231,7 +232,7 @@
 			<a
 				href="/profil"
 				class="nav-item"
-				class:active={$page.url.pathname === '/profil'}
+				class:active={page.url.pathname === '/profil'}
 			>
 				<KeyRound size={22} class="nav-icon" />
 				<span>Profil</span>

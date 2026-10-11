@@ -17,8 +17,14 @@
 
 	let { data, form } = $props();
 
-	let transactionType = $state<'debt' | 'payment'>((data.initialType as any) || 'debt');
-	let selectedFriendId = $state<number>(data.selectedFriendId || (data.friends[0]?.id || 0));
+	let transactionType = $state<'debt' | 'payment'>('debt');
+	let selectedFriendId = $state<number>(0);
+
+	$effect(() => {
+		if (data.initialType) transactionType = data.initialType as any;
+		if (data.selectedFriendId) selectedFriendId = data.selectedFriendId;
+		else if (data.friends?.length) selectedFriendId = data.friends[0].id;
+	});
 
 	// Debt form state
 	let debtRole = $state<'i_paid' | 'friend_paid'>('i_paid');
