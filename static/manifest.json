@@ -1,0 +1,17 @@
+{
+  "name": "Rembourse",
+  "short_name": "Rembourse",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fcfdfc",
+  "theme_color": "#fdc619",
+  "description": "Gérez vos avances d'argent, dettes et remboursements entre amis simplement.",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
