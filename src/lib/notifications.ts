@@ -88,7 +88,7 @@ export async function subscribeToPushNotifications(): Promise<{ success: boolean
     const convertedKey = urlBase64ToUint8Array(publicKey);
     const subscription = await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: convertedKey
+      applicationServerKey: convertedKey as unknown as BufferSource
     });
 
     // 5. Send subscription to server

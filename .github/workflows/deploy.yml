@@ -1,0 +1,63 @@
+name: Deploy Rembourse to Proxmox CTX
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+jobs:
+  # MÉTHODE 1 : Déploiement direct avec un GitHub Runner Self-Hosted sur votre CTX
+  # (Idéal : pas besoin d'ouvrir de port SSH sur internet, le runner tourne dans le CTX)
+  deploy-runner:
+    name: Déploiement sur CTX Proxmox (Self-Hosted Runner)
+    runs-on: self-hosted
+    steps:
+      - name: 📥 Mise à jour du code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: 📦 Installation des dépendances
+        run: npm ci
+
+      - name: 🔨 Compilation PWA & Node
+        run: npm run build
+
+      - name: 🔄 Redémarrage de l'application
+        run: |
+          if systemctl is-active --quiet rembourse 2>/dev/null; then
+            echo "Redémarrage du service systemd..."
+            sudo systemctl restart rembourse
+          elif [ -f docker-compose.yml ] && command -v docker &> /dev/null; then
+            echo "Redémarrage du conteneur Docker..."
+            docker compose up -d --build
+          else
+            echo "Redémarrage alternatif..."
+            sudo systemctl restart rembourse || true
+          fi
+          echo "✅ Rembourse déployé et à jour !"
+
+  # MÉTHODE 2 : Si vous préférez déployer depuis le cloud GitHub via SSH
+  # Décommentez cette section si vous n'avez pas installé de runner self-hosted sur le CTX :
+  #
+  # deploy-ssh:
+  #   name: Déploiement via SSH
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Déploiement distant par SSH
+  #       uses: appleboy/ssh-action@v1.0.3
+  #       with:
+  #         host: ${{ secrets.CTX_HOST }}
+  #         username: ${{ secrets.CTX_USER || 'root' }}
+  #         key: ${{ secrets.CTX_SSH_KEY }}
+  #         port: ${{ secrets.CTX_PORT || 22 }}
+  #         script: |
+  #           cd /opt/rembourse
+  #           chmod +x ./scripts/deploy.sh
+  #           ./scripts/deploy.sh

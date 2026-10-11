@@ -295,7 +295,7 @@
 							<div style="text-align: right;">
 								<span class="badge badge-pending">
 									<Clock size={12} />
-									En attente de {d.debtor_name.split(' ')[0]}
+									En attente de {d.debtor_name ? d.debtor_name.split(' ')[0] : 'votre ami'}
 								</span>
 							</div>
 						</div>
