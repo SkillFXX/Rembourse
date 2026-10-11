@@ -120,6 +120,20 @@ db.exec(`
     is_read INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `);
 
 // Auto-migrate from old_data.sql if users table is empty
@@ -726,6 +740,23 @@ export function getUserBalances(userId: number): {
   };
 }
 
+type PushNotifier = (userId: number, payload: { title: string; body: string; url?: string }) => void;
+let pushNotifier: PushNotifier | null = null;
+
+export function registerPushNotifier(notifier: PushNotifier) {
+  pushNotifier = notifier;
+}
+
+export function notifyUserPush(userId: number, payload: { title: string; body: string; url?: string }) {
+  if (pushNotifier) {
+    try {
+      pushNotifier(userId, payload);
+    } catch (e) {
+      console.error('Error invoking push notifier:', e);
+    }
+  }
+}
+
 export function createDebt(data: {
   creatorId: number;
   creditorId: number;
@@ -794,10 +825,17 @@ export function createDebt(data: {
       `Dette de ${data.amount.toFixed(2)} € soumise : #${data.debtorId} doit à #${data.creditorId} (Motif: ${data.reason})`
     );
 
-    return debtId;
+    return { debtId, creatorName, actionDesc };
   })();
 
-  return { success: true, debtId: result };
+  // Send push notification to target user
+  notifyUserPush(targetUserId, {
+    title: '💰 Nouvelle dépense à valider',
+    body: `${result.creatorName} : ${data.amount.toFixed(2)} € (${data.reason})`,
+    url: '/validations'
+  });
+
+  return { success: true, debtId: result.debtId };
 }
 
 export function createPayment(data: {
@@ -869,10 +907,17 @@ export function createPayment(data: {
       `Remboursement de ${data.amount.toFixed(2)} € soumis de #${data.payerId} vers #${data.receiverId} (Moyen: ${paymentMethod}, Motif: ${reason})`
     );
 
-    return paymentId;
+    return { paymentId, creatorName, notifMsg };
   })();
 
-  return { success: true, paymentId: result };
+  // Push notification for target user
+  notifyUserPush(targetUserId, {
+    title: '💸 Nouveau remboursement à valider',
+    body: result.notifMsg,
+    url: '/validations'
+  });
+
+  return { success: true, paymentId: result.paymentId };
 }
 
 export function validateTransaction(
@@ -895,6 +940,9 @@ export function validateTransaction(
     const newCreditorApproved = isCreditor ? 1 : debt.creditor_approved;
     const newDebtorApproved = !isCreditor ? 1 : debt.debtor_approved;
 
+    let creatorIdToNotify: number | null = null;
+    let pushMsg = '';
+
     db.transaction(() => {
       db.prepare(`
         UPDATE debts
@@ -906,13 +954,13 @@ export function validateTransaction(
       // Notify the creator if someone else validated
       if (debt.creator_id !== userId) {
         const user = getUserById(userId);
+        creatorIdToNotify = debt.creator_id;
+        pushMsg = `${user?.full_name || 'Votre ami'} a validé la dépense de ${debt.amount.toFixed(2)} € (${debt.reason}).`;
+
         db.prepare(`
           INSERT INTO notifications (user_id, type, title, message, link)
           VALUES (?, 'DEBT_APPROVED', 'Transaction validée !', ?, '/historique')
-        `).run(
-          debt.creator_id,
-          `${user?.full_name || 'Votre ami'} a validé la dépense de ${debt.amount.toFixed(2)} € (${debt.reason}).`
-        );
+        `).run(debt.creator_id, pushMsg);
       }
 
       // Audit log
@@ -921,6 +969,14 @@ export function validateTransaction(
         VALUES (?, 'DEBT_APPROVED', 'debt', ?, ?)
       `).run(userId, id, `Dette #${id} de ${debt.amount.toFixed(2)} € validée par l'utilisateur #${userId} (Motif: ${debt.reason})`);
     })();
+
+    if (creatorIdToNotify && pushMsg) {
+      notifyUserPush(creatorIdToNotify, {
+        title: '✅ Dépense validée !',
+        body: pushMsg,
+        url: '/historique'
+      });
+    }
 
     return { success: true };
   } else {
@@ -938,6 +994,9 @@ export function validateTransaction(
     const newPayerApproved = isPayer ? 1 : payment.payer_approved;
     const newReceiverApproved = !isPayer ? 1 : payment.receiver_approved;
 
+    let creatorIdToNotify: number | null = null;
+    let pushMsg = '';
+
     db.transaction(() => {
       db.prepare(`
         UPDATE payments
@@ -948,13 +1007,13 @@ export function validateTransaction(
 
       if (payment.creator_id !== userId) {
         const user = getUserById(userId);
+        creatorIdToNotify = payment.creator_id;
+        pushMsg = `${user?.full_name || 'Votre ami'} a validé le remboursement de ${payment.amount.toFixed(2)} €.`;
+
         db.prepare(`
           INSERT INTO notifications (user_id, type, title, message, link)
           VALUES (?, 'PAYMENT_APPROVED', 'Remboursement validé !', ?, '/historique')
-        `).run(
-          payment.creator_id,
-          `${user?.full_name || 'Votre ami'} a validé le remboursement de ${payment.amount.toFixed(2)} €.`
-        );
+        `).run(payment.creator_id, pushMsg);
       }
 
       db.prepare(`
@@ -962,6 +1021,14 @@ export function validateTransaction(
         VALUES (?, 'PAYMENT_APPROVED', 'payment', ?, ?)
       `).run(userId, id, `Remboursement #${id} de ${payment.amount.toFixed(2)} € validé par #${userId}`);
     })();
+
+    if (creatorIdToNotify && pushMsg) {
+      notifyUserPush(creatorIdToNotify, {
+        title: '✅ Remboursement validé !',
+        body: pushMsg,
+        url: '/historique'
+      });
+    }
 
     return { success: true };
   }
@@ -986,6 +1053,9 @@ export function disputeTransaction(
       return { success: false, error: 'Vous ne participez pas à cette transaction.' };
     }
 
+    const user = getUserById(userId);
+    const disputeMsg = `${user?.full_name || 'Votre ami'} a contesté la dépense de ${debt.amount.toFixed(2)} €. Motif : "${cleanReason}"`;
+
     db.transaction(() => {
       db.prepare(`
         UPDATE debts
@@ -995,20 +1065,22 @@ export function disputeTransaction(
       `).run(cleanReason, userId, now, now, id);
 
       // Notify creator
-      const user = getUserById(userId);
       db.prepare(`
         INSERT INTO notifications (user_id, type, title, message, link)
         VALUES (?, 'DEBT_DISPUTED', 'Dépense contestée !', ?, '/historique')
-      `).run(
-        debt.creator_id,
-        `${user?.full_name || 'Votre ami'} a contesté la dépense de ${debt.amount.toFixed(2)} €. Motif : "${cleanReason}"`
-      );
+      `).run(debt.creator_id, disputeMsg);
 
       db.prepare(`
         INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
         VALUES (?, 'DEBT_DISPUTED', 'debt', ?, ?)
       `).run(userId, id, `Dette #${id} contestée par #${userId}. Raison: '${cleanReason}'`);
     })();
+
+    notifyUserPush(debt.creator_id, {
+      title: '⚠️ Dépense contestée !',
+      body: disputeMsg,
+      url: '/historique'
+    });
 
     return { success: true };
   } else {
@@ -1018,6 +1090,9 @@ export function disputeTransaction(
       return { success: false, error: 'Vous ne participez pas à ce remboursement.' };
     }
 
+    const user = getUserById(userId);
+    const disputeMsg = `${user?.full_name || 'Votre ami'} a contesté le remboursement de ${payment.amount.toFixed(2)} €. Motif : "${cleanReason}"`;
+
     db.transaction(() => {
       db.prepare(`
         UPDATE payments
@@ -1026,20 +1101,22 @@ export function disputeTransaction(
         WHERE id = ?
       `).run(cleanReason, userId, now, id);
 
-      const user = getUserById(userId);
       db.prepare(`
         INSERT INTO notifications (user_id, type, title, message, link)
         VALUES (?, 'PAYMENT_DISPUTED', 'Remboursement contesté !', ?, '/historique')
-      `).run(
-        payment.creator_id,
-        `${user?.full_name || 'Votre ami'} a contesté le remboursement de ${payment.amount.toFixed(2)} €. Motif : "${cleanReason}"`
-      );
+      `).run(payment.creator_id, disputeMsg);
 
       db.prepare(`
         INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
         VALUES (?, 'PAYMENT_DISPUTED', 'payment', ?, ?)
       `).run(userId, id, `Remboursement #${id} contesté par #${userId}. Raison: '${cleanReason}'`);
     })();
+
+    notifyUserPush(payment.creator_id, {
+      title: '⚠️ Remboursement contesté !',
+      body: disputeMsg,
+      url: '/historique'
+    });
 
     return { success: true };
   }
@@ -1154,4 +1231,43 @@ export function logAudit(userId: number, action: string, entityType: string, ent
     VALUES (?, ?, ?, ?, ?)
   `).run(userId, action, entityType, entityId, details);
 }
+
+// Push Subscriptions & Settings
+export function savePushSubscription(userId: number, endpoint: string, p256dh: string, auth: string): void {
+  db.prepare(`
+    INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(endpoint) DO UPDATE SET
+      user_id = excluded.user_id,
+      p256dh = excluded.p256dh,
+      auth = excluded.auth,
+      created_at = datetime('now')
+  `).run(userId, endpoint, p256dh, auth);
+}
+
+export function removePushSubscription(endpoint: string): void {
+  db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(endpoint);
+}
+
+export function getUserPushSubscriptions(userId: number): { endpoint: string; p256dh: string; auth: string }[] {
+  return db.prepare('SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ?').all(userId) as {
+    endpoint: string;
+    p256dh: string;
+    auth: string;
+  }[];
+}
+
+export function getAppSetting(key: string): string | null {
+  const row = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key) as { value: string } | undefined;
+  return row ? row.value : null;
+}
+
+export function setAppSetting(key: string, value: string): void {
+  db.prepare(`
+    INSERT INTO app_settings (key, value)
+    VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(key, value);
+}
+
 

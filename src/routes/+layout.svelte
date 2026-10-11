@@ -2,7 +2,11 @@
 	import '../app.css';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { requestNotificationPermission, sendLocalNotification } from '$lib/notifications';
+	import {
+		registerServiceWorker,
+		getPushSubscriptionState,
+		subscribeToPushNotifications
+	} from '$lib/notifications';
 	import {
 		Home,
 		CheckSquare,
@@ -14,7 +18,10 @@
 		UserCheck,
 		X,
 		KeyRound,
-		ChevronDown
+		ChevronDown,
+		Download,
+		BellRing,
+		Smartphone
 	} from 'lucide-svelte';
 
 	let { data, children } = $props();
@@ -25,7 +32,51 @@
 	let generatedInviteUrl = $state('');
 	let inviteLoading = $state(false);
 	let copied = $state(false);
-	let lastPendingCount = $state(0);
+
+	// PWA Install state
+	let installPrompt = $state<any>(null);
+	let canInstall = $state(false);
+	let isInstalled = $state(false);
+	let installDismissed = $state(false);
+	let isIos = $state(false);
+	let showIosModal = $state(false);
+
+	// Web Push state
+	let pushSupported = $state(false);
+	let pushPermission = $state<NotificationPermission>('default');
+	let pushSubscribed = $state(false);
+	let pushDismissed = $state(false);
+	let pushEnabling = $state(false);
+
+	async function handleInstallClick() {
+		if (installPrompt) {
+			installPrompt.prompt();
+			const { outcome } = await installPrompt.userChoice;
+			if (outcome === 'accepted') {
+				canInstall = false;
+				isInstalled = true;
+			}
+			installPrompt = null;
+		} else if (isIos) {
+			showIosModal = true;
+		}
+	}
+
+	async function enablePushNotifications() {
+		pushEnabling = true;
+		try {
+			const res = await subscribeToPushNotifications();
+			if (res.success) {
+				pushPermission = 'granted';
+				pushSubscribed = true;
+				pushDismissed = true;
+			} else {
+				alert(res.error || 'Erreur lors de l\'activation des notifications.');
+			}
+		} finally {
+			pushEnabling = false;
+		}
+	}
 
 	async function generateInvite() {
 		inviteLoading = true;
@@ -61,31 +112,41 @@
 		};
 		window.addEventListener('click', closeDropdown);
 
-		if (data.user) {
-			lastPendingCount = data.pendingCount || 0;
-			requestNotificationPermission();
+		if (typeof window !== 'undefined') {
+			isInstalled =
+				window.matchMedia('(display-mode: standalone)').matches ||
+				(navigator as any).standalone === true;
+			const ua = window.navigator.userAgent.toLowerCase();
+			isIos = /iphone|ipad|ipod/.test(ua) && !(window as any).MSStream && !isInstalled;
 
-			const interval = setInterval(async () => {
-				try {
-					const res = await fetch('/api/notifications');
-					if (res.ok) {
-						const d = await res.json();
-						if (d.pendingValidationsCount > lastPendingCount) {
-							sendLocalNotification(
-								'Rembourse - Action requise',
-								`Vous avez ${d.pendingValidationsCount} transaction(s) en attente de votre validation !`
-							);
-						}
-						lastPendingCount = d.pendingValidationsCount;
-					}
-				} catch (e) {
-					// silent
+			// Register PWA Service Worker
+			registerServiceWorker();
+
+			// Listen for standard PWA install prompt
+			const installHandler = (e: any) => {
+				e.preventDefault();
+				installPrompt = e;
+				canInstall = true;
+			};
+			window.addEventListener('beforeinstallprompt', installHandler);
+
+			// Check Push Notification status
+			getPushSubscriptionState().then((state) => {
+				pushSupported = state.supported;
+				pushPermission = state.permission;
+				pushSubscribed = state.subscribed;
+
+				// If already granted, ensure subscription is active
+				if (state.permission === 'granted' && !state.subscribed && data.user) {
+					subscribeToPushNotifications().then((r) => {
+						if (r.success) pushSubscribed = true;
+					});
 				}
-			}, 15000);
+			});
 
 			return () => {
 				window.removeEventListener('click', closeDropdown);
-				clearInterval(interval);
+				window.removeEventListener('beforeinstallprompt', installHandler);
 			};
 		}
 
@@ -238,6 +299,73 @@
 	{/if}
 
 	<main class="main-content">
+		<!-- PWA Install Banner (Mobile & Desktop) -->
+		{#if (canInstall || (isIos && !isInstalled)) && !installDismissed && !isInstalled}
+			<div class="pwa-install-banner">
+				<div class="install-info">
+					<img src="/icon.png" alt="Rembourse" class="install-icon" />
+					<div>
+						<div class="install-title">Installer Rembourse</div>
+						<div class="install-sub">Application ultra-rapide & notifications push</div>
+					</div>
+				</div>
+				<div class="install-actions">
+					<button type="button" class="btn-install" onclick={handleInstallClick}>
+						<Download size={14} />
+						Installer
+					</button>
+					<button
+						type="button"
+						class="btn-dismiss"
+						onclick={() => (installDismissed = true)}
+						aria-label="Fermer"
+					>
+						<X size={16} />
+					</button>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Web Push Prompt (Si l'utilisateur est connecté et n'a pas encore activé les push) -->
+		{#if data.user && pushSupported && pushPermission === 'default' && !pushDismissed}
+			<div class="push-banner">
+				<div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0;">
+					<div
+						style="width: 36px; height: 36px; border-radius: var(--radius-sm); background: #fef3c7; color: #b45309; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"
+					>
+						<BellRing size={20} />
+					</div>
+					<div>
+						<div style="font-weight: 800; font-size: 0.9rem; color: var(--color-dark);">
+							Activer les notifications push
+						</div>
+						<div style="font-size: 0.8rem; color: #475569;">
+							Soyez prévenu dès qu'un ami ajoute une dépense ou un remboursement.
+						</div>
+					</div>
+				</div>
+				<div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+					<button
+						type="button"
+						class="btn btn-sm btn-primary"
+						disabled={pushEnabling}
+						onclick={enablePushNotifications}
+					>
+						{pushEnabling ? 'Activation...' : 'Activer'}
+					</button>
+					<button
+						type="button"
+						class="btn-dismiss"
+						style="color: #64748b;"
+						onclick={() => (pushDismissed = true)}
+						aria-label="Fermer"
+					>
+						<X size={16} />
+					</button>
+				</div>
+			</div>
+		{/if}
+
 		{@render children()}
 	</main>
 
@@ -404,3 +532,63 @@
 		</div>
 	</div>
 {/if}
+
+<!-- Modal Guide Installation iOS Safari -->
+{#if showIosModal}
+	<div
+		class="modal-overlay"
+		role="dialog"
+		aria-modal="true"
+		tabindex="-1"
+		onclick={(e) => {
+			if (e.target === e.currentTarget) showIosModal = false;
+		}}
+		onkeydown={(e) => {
+			if (e.key === 'Escape') showIosModal = false;
+		}}
+	>
+		<div class="modal-content">
+			<div class="modal-header">
+				<h3 style="font-size: 1.25rem; color: var(--color-dark); display: flex; align-items: center; gap: 0.5rem;">
+					<Smartphone size={20} color="#fdc619" />
+					Installer sur iPhone / iPad
+				</h3>
+				<button class="btn btn-outline btn-icon" onclick={() => (showIosModal = false)}>
+					<X size={18} />
+				</button>
+			</div>
+			<div class="modal-body" style="display: flex; flex-direction: column; gap: 1rem;">
+				<p style="color: var(--color-text-muted); font-size: 0.95rem;">
+					Pour installer Rembourse comme une application sur votre iPhone (Safari) :
+				</p>
+				<div style="background: #f8fafc; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem;">
+					<div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+						<span style="background: var(--color-primary); color: var(--color-dark); font-weight: 800; border-radius: 9999px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0;">1</span>
+						<span style="font-size: 0.9rem; color: var(--color-dark);">
+							Touchez le bouton <strong>Partager</strong> en bas de l'écran Safari (le carré avec une flèche vers le haut).
+						</span>
+					</div>
+					<div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+						<span style="background: var(--color-primary); color: var(--color-dark); font-weight: 800; border-radius: 9999px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0;">2</span>
+						<span style="font-size: 0.9rem; color: var(--color-dark);">
+							Faites défiler vers le bas et sélectionnez <strong>Sur l'écran d'accueil</strong>.
+						</span>
+					</div>
+					<div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+						<span style="background: var(--color-primary); color: var(--color-dark); font-weight: 800; border-radius: 9999px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0;">3</span>
+						<span style="font-size: 0.9rem; color: var(--color-dark);">
+							Appuyez sur <strong>Ajouter</strong> en haut à droite.
+						</span>
+					</div>
+				</div>
+				<p style="font-size: 0.85rem; color: #166534; background: #f0fdf4; padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid #bbf7d0;">
+					✨ L'icône Rembourse apparaîtra sur votre écran d'accueil avec les notifications push en direct !
+				</p>
+			</div>
+			<div class="modal-footer">
+				<button class="btn btn-dark" onclick={() => (showIosModal = false)}>Compris</button>
+			</div>
+		</div>
+	</div>
+{/if}
+

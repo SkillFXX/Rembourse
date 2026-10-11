@@ -1,4 +1,11 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import {
+		isPushSupported,
+		getPushSubscriptionState,
+		subscribeToPushNotifications,
+		unsubscribeFromPushNotifications
+	} from '$lib/notifications';
 	import {
 		KeyRound,
 		User,
@@ -10,12 +17,52 @@
 		AlertCircle,
 		CheckCircle2,
 		ShieldCheck,
-		Lock
+		Lock,
+		BellRing,
+		BellOff,
+		Smartphone,
+		Download
 	} from 'lucide-svelte';
 
 	let { data, form } = $props();
 
 	let copiedCode = $state<string | null>(null);
+
+	let pushState = $state<{ supported: boolean; permission: NotificationPermission; subscribed: boolean }>({
+		supported: false,
+		permission: 'default',
+		subscribed: false
+	});
+	let pushLoading = $state(false);
+	let pushMsg = $state<{ type: 'success' | 'error'; text: string } | null>(null);
+
+	onMount(() => {
+		getPushSubscriptionState().then((st) => {
+			pushState = st;
+		});
+	});
+
+	async function togglePush() {
+		pushLoading = true;
+		pushMsg = null;
+		try {
+			if (pushState.subscribed) {
+				await unsubscribeFromPushNotifications();
+				pushState = await getPushSubscriptionState();
+				pushMsg = { type: 'success', text: 'Notifications désactivées sur cet appareil.' };
+			} else {
+				const res = await subscribeToPushNotifications();
+				pushState = await getPushSubscriptionState();
+				if (res.success) {
+					pushMsg = { type: 'success', text: 'Notifications push activées avec succès !' };
+				} else {
+					pushMsg = { type: 'error', text: res.error || 'Erreur lors de l\'activation.' };
+				}
+			}
+		} finally {
+			pushLoading = false;
+		}
+	}
 
 	function copyLink(code: string) {
 		const url = `${window.location.origin}/register?invite=${code}`;
@@ -277,6 +324,77 @@
 				</button>
 			</div>
 		</form>
+	</div>
+
+	<!-- SECTION 3: NOTIFICATIONS PUSH & APPLICATION PWA -->
+	<div class="card" style="padding: 1.75rem;">
+		<div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1.25rem;">
+			<div style="width: 36px; height: 36px; border-radius: var(--radius-sm); background: #dbeafe; color: #1e40af; display: flex; align-items: center; justify-content: center;">
+				<BellRing size={20} />
+			</div>
+			<div>
+				<h2 style="font-size: 1.3rem; color: var(--color-dark);">
+					Notifications Push & PWA
+				</h2>
+				<span style="font-size: 0.8rem; color: #64748b;">
+					Recevez des alertes en temps réel à chaque transaction
+				</span>
+			</div>
+		</div>
+
+		{#if pushMsg}
+			<div style="background-color: {pushMsg.type === 'success' ? 'var(--color-success-light)' : 'var(--color-danger-light)'}; border-left: 4px solid {pushMsg.type === 'success' ? 'var(--color-success)' : 'var(--color-danger)'}; padding: 0.85rem; border-radius: var(--radius-sm); margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem; color: {pushMsg.type === 'success' ? '#065f46' : '#991b1b'}; font-size: 0.9rem; font-weight: 700;">
+				{#if pushMsg.type === 'success'}
+					<CheckCircle2 size={18} />
+				{:else}
+					<AlertCircle size={18} />
+				{/if}
+				<span>{pushMsg.text}</span>
+			</div>
+		{/if}
+
+		<div style="display: flex; flex-direction: column; gap: 1rem;">
+			<div style="display: flex; align-items: center; justify-content: space-between; padding: 1rem; background: #f8fafc; border-radius: var(--radius-md); border: 1px solid var(--color-border); gap: 0.75rem; flex-wrap: wrap;">
+				<div style="display: flex; align-items: center; gap: 0.75rem;">
+					{#if pushState.subscribed}
+						<div style="width: 10px; height: 10px; border-radius: 9999px; background: var(--color-success); flex-shrink: 0;"></div>
+						<div>
+							<div style="font-weight: 800; font-size: 0.95rem; color: var(--color-dark);">Notifications push actives</div>
+							<div style="font-size: 0.8rem; color: #64748b;">Cet appareil recevra une alerte à chaque nouvelle transaction.</div>
+						</div>
+					{:else}
+						<div style="width: 10px; height: 10px; border-radius: 9999px; background: #94a3b8; flex-shrink: 0;"></div>
+						<div>
+							<div style="font-weight: 800; font-size: 0.95rem; color: var(--color-dark);">Notifications push inactives</div>
+							<div style="font-size: 0.8rem; color: #64748b;">Activez-les pour ne manquer aucune demande de validation.</div>
+						</div>
+					{/if}
+				</div>
+
+				<button
+					type="button"
+					class="btn btn-sm {pushState.subscribed ? 'btn-outline' : 'btn-primary'}"
+					disabled={pushLoading || !pushState.supported}
+					onclick={togglePush}
+				>
+					{#if pushLoading}
+						Patientez...
+					{:else if pushState.subscribed}
+						<BellOff size={16} />
+						Désactiver
+					{:else}
+						<BellRing size={16} />
+						Activer les notifications
+					{/if}
+				</button>
+			</div>
+
+			{#if !pushState.supported}
+				<div style="font-size: 0.85rem; color: #b45309; background: #fffbeb; padding: 0.75rem; border-radius: var(--radius-sm); border-left: 4px solid var(--color-primary);">
+					ℹ️ Les notifications Push Web nécessitent un navigateur moderne (Chrome, Edge, Firefox, Safari iOS 16.4+).
+				</div>
+			{/if}
+		</div>
 	</div>
 </div>
 

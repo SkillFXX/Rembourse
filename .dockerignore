@@ -6,3 +6,4 @@ data/*.db*
 .git
 .vscode
 npm-debug.log*
+

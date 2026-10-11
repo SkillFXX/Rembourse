@@ -1,18 +1,33 @@
 {
+  "id": "/",
   "name": "Rembourse",
   "short_name": "Rembourse",
+  "description": "Gérez vos avances d'argent, dettes et remboursements entre amis simplement.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#fcfdfc",
   "theme_color": "#fdc619",
-  "description": "Gérez vos avances d'argent, dettes et remboursements entre amis simplement.",
+  "categories": ["finance", "lifestyle"],
   "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "/icon.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
-
