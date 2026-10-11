@@ -109,25 +109,6 @@
 					<Banknote size={18} />
 					<span>Rembourser</span>
 				</a>
-
-				<a
-					href="/invitations"
-					class="btn"
-					style="background: #fdc619; color: #0e2331; font-weight: 800; padding: 0.75rem 1.25rem;"
-				>
-					<Share2 size={18} />
-					<span>+ Inviter un ami</span>
-				</a>
-
-				<a
-					href="/profil"
-					class="btn"
-					style="background: rgba(255, 255, 255, 0.1); color: #cbd5e1; backdrop-filter: blur(8px); padding: 0.75rem 1rem;"
-					title="Mon profil et modifier mon mot de passe"
-				>
-					<KeyRound size={16} />
-					<span>Mot de passe</span>
-				</a>
 			</div>
 		</div>
 	</div>

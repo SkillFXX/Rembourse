@@ -9,17 +9,17 @@
 		History,
 		Users,
 		Share2,
-		Bell,
 		LogOut,
 		PlusCircle,
 		UserCheck,
-		Menu,
 		X,
-		KeyRound
+		KeyRound,
+		ChevronDown
 	} from 'lucide-svelte';
 
 	let { data, children } = $props();
 
+	let showUserMenu = $state(false);
 	let showQuickSwitchModal = $state(false);
 	let showInviteModal = $state(false);
 	let generatedInviteUrl = $state('');
@@ -56,11 +56,15 @@
 	}
 
 	onMount(() => {
-		// Ask notification permission on first interaction if logged in
+		const closeDropdown = () => {
+			showUserMenu = false;
+		};
+		window.addEventListener('click', closeDropdown);
+
 		if (data.user) {
+			lastPendingCount = data.pendingCount || 0;
 			requestNotificationPermission();
 
-			// Periodic check for new transactions requiring validation
 			const interval = setInterval(async () => {
 				try {
 					const res = await fetch('/api/notifications');
@@ -79,8 +83,15 @@
 				}
 			}, 15000);
 
-			return () => clearInterval(interval);
+			return () => {
+				window.removeEventListener('click', closeDropdown);
+				clearInterval(interval);
+			};
 		}
+
+		return () => {
+			window.removeEventListener('click', closeDropdown);
+		};
 	});
 </script>
 
@@ -93,7 +104,7 @@
 					<img src="/text.png" alt="Rembourse" class="brand-text-img" />
 				</a>
 
-				<!-- Desktop Nav -->
+				<!-- Desktop Nav (Épuré & Simple) -->
 				<nav class="desktop-nav">
 					<a href="/" class="desktop-nav-link" class:active={page.url.pathname === '/'}>
 						<Home size={18} />
@@ -128,62 +139,99 @@
 						<Users size={18} />
 						<span>Amis</span>
 					</a>
-					<a
-						href="/invitations"
-						class="desktop-nav-link"
-						class:active={page.url.pathname === '/invitations'}
-					>
-						<Share2 size={18} />
-						<span>Invitations</span>
-					</a>
-					<a
-						href="/profil"
-						class="desktop-nav-link"
-						class:active={page.url.pathname === '/profil'}
-					>
-						<KeyRound size={18} />
-						<span>Profil & Sécurité</span>
-					</a>
 				</nav>
 
-				<div class="header-actions">
+				<!-- Unique Compact Profile Dropdown -->
+				<div class="header-actions" style="position: relative;">
 					<button
-						onclick={generateInvite}
-						class="btn btn-primary btn-sm"
-						title="Inviter un ami"
-					>
-						<Share2 size={15} />
-						<span>+ Inviter un ami</span>
-					</button>
-
-					<a
-						href="/profil"
+						type="button"
+						onclick={(e) => {
+							e.stopPropagation();
+							showUserMenu = !showUserMenu;
+						}}
 						class="btn btn-outline btn-sm"
-						style="border-color: #cbd5e1; gap: 0.35rem;"
-						title="Mon profil & Modifier mot de passe"
+						style="border-color: #cbd5e1; gap: 0.45rem; padding: 0.35rem 0.75rem; background: #ffffff;"
 					>
-						<KeyRound size={15} color="#0e2331" />
-						<span class="btn-label-desktop">Mon compte</span>
-					</a>
-
-					<!-- Quick User Switcher button (ideal for testing multi-user workflow) -->
-					<button
-						onclick={() => (showQuickSwitchModal = true)}
-						class="btn btn-outline btn-sm"
-						style="border-color: #cbd5e1; gap: 0.35rem;"
-						title="Changer d'utilisateur (Test multi-comptes)"
-					>
-						<UserCheck size={16} color="#0e2331" />
-						<span style="max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+						<div
+							style="width: 28px; height: 28px; border-radius: 9999px; background: #0e2331; color: #fdc619; display: flex; align-items: center; justify-content: center; font-weight: 800; font-family: var(--font-title); font-size: 0.85rem;"
+						>
+							{data.user.full_name[0]}
+						</div>
+						<span style="font-weight: 800; color: var(--color-dark); font-size: 0.9rem;">
 							{data.user.full_name.split(' ')[0]}
 						</span>
+						<ChevronDown size={14} color="#64748b" />
 					</button>
 
-					<form action="/api/auth/logout" method="POST" style="display: inline;">
-						<button class="btn btn-outline btn-icon" title="Se déconnecter" type="submit">
-							<LogOut size={16} />
-						</button>
-					</form>
+					{#if showUserMenu}
+						<!-- svelte-ignore a11y_click_events_have_key_events -->
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<div
+							class="user-dropdown-menu"
+							onclick={(e) => e.stopPropagation()}
+						>
+							<div style="padding: 0.85rem 1rem; border-bottom: 1px solid var(--color-border); background: #f8fafc;">
+								<div style="font-weight: 800; color: var(--color-dark); font-size: 0.95rem;">
+									{data.user.full_name}
+								</div>
+								<div style="font-size: 0.8rem; color: #64748b;">
+									@{data.user.username}
+								</div>
+							</div>
+
+							<div style="padding: 0.4rem; display: flex; flex-direction: column; gap: 0.2rem;">
+								<a
+									href="/profil"
+									class="dropdown-item"
+									onclick={() => (showUserMenu = false)}
+								>
+									<KeyRound size={16} />
+									<span>Profil & Mot de passe</span>
+								</a>
+
+								<button
+									type="button"
+									class="dropdown-item"
+									style="width: 100%; border: none; background: none; text-align: left; cursor: pointer;"
+									onclick={() => {
+										showUserMenu = false;
+										generateInvite();
+									}}
+								>
+									<Share2 size={16} color="#fdc619" />
+									<span>Inviter un ami</span>
+								</button>
+
+								<button
+									type="button"
+									class="dropdown-item"
+									style="width: 100%; border: none; background: none; text-align: left; cursor: pointer;"
+									onclick={() => {
+										showUserMenu = false;
+										showQuickSwitchModal = true;
+									}}
+								>
+									<UserCheck size={16} />
+									<span>Changer d'utilisateur (Test)</span>
+								</button>
+
+								<form
+									action="/api/auth/logout"
+									method="POST"
+									style="margin-top: 0.25rem; border-top: 1px solid var(--color-border-subtle); padding-top: 0.25rem;"
+								>
+									<button
+										type="submit"
+										class="dropdown-item"
+										style="width: 100%; border: none; background: none; text-align: left; cursor: pointer; color: var(--color-danger);"
+									>
+										<LogOut size={16} />
+										<span>Se déconnecter</span>
+									</button>
+								</form>
+							</div>
+						</div>
+					{/if}
 				</div>
 			</div>
 		</header>
@@ -194,7 +242,7 @@
 	</main>
 
 	{#if data.user}
-		<!-- Mobile Bottom Nav -->
+		<!-- Mobile Bottom Nav (Simple & Épuré) -->
 		<nav class="bottom-nav">
 			<a href="/" class="nav-item" class:active={page.url.pathname === '/'}>
 				<Home size={22} class="nav-icon" />
@@ -216,18 +264,20 @@
 				class="nav-item"
 				style="color: var(--color-dark); margin-top: -12px;"
 			>
-				<div style="background: var(--color-primary); width: 44px; height: 44px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-md);">
+				<div
+					style="background: var(--color-primary); width: 44px; height: 44px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-md);"
+				>
 					<PlusCircle size={26} color="#0e2331" />
 				</div>
 				<span style="font-size: 0.7rem; font-weight: 800;">Ajouter</span>
 			</a>
 			<a
-				href="/invitations"
+				href="/historique"
 				class="nav-item"
-				class:active={page.url.pathname === '/invitations'}
+				class:active={page.url.pathname === '/historique'}
 			>
-				<Share2 size={22} class="nav-icon" />
-				<span>Inviter</span>
+				<History size={22} class="nav-icon" />
+				<span>Historique</span>
 			</a>
 			<a
 				href="/profil"
@@ -243,7 +293,18 @@
 
 <!-- Modal Inviter un ami -->
 {#if showInviteModal}
-	<div class="modal-overlay" onclick={(e) => { if (e.target === e.currentTarget) showInviteModal = false; }}>
+	<div
+		class="modal-overlay"
+		role="dialog"
+		aria-modal="true"
+		tabindex="-1"
+		onclick={(e) => {
+			if (e.target === e.currentTarget) showInviteModal = false;
+		}}
+		onkeydown={(e) => {
+			if (e.key === 'Escape') showInviteModal = false;
+		}}
+	>
 		<div class="modal-content">
 			<div class="modal-header">
 				<h3 style="font-size: 1.25rem; color: var(--color-dark); display: flex; align-items: center; gap: 0.5rem;">
@@ -283,7 +344,18 @@
 
 <!-- Modal Changement Rapide d'Utilisateur (Super pratique pour tester les validations réciproques) -->
 {#if showQuickSwitchModal}
-	<div class="modal-overlay" onclick={(e) => { if (e.target === e.currentTarget) showQuickSwitchModal = false; }}>
+	<div
+		class="modal-overlay"
+		role="dialog"
+		aria-modal="true"
+		tabindex="-1"
+		onclick={(e) => {
+			if (e.target === e.currentTarget) showQuickSwitchModal = false;
+		}}
+		onkeydown={(e) => {
+			if (e.key === 'Escape') showQuickSwitchModal = false;
+		}}
+	>
 		<div class="modal-content">
 			<div class="modal-header">
 				<h3 style="font-size: 1.25rem; color: var(--color-dark); display: flex; align-items: center; gap: 0.5rem;">
@@ -308,7 +380,9 @@
 								style="width: 100%; justify-content: space-between; padding: 0.75rem 1rem; {data.user?.id === u.id ? 'border: 2px solid var(--color-primary); background-color: var(--color-primary-light);' : ''}"
 							>
 								<div style="display: flex; align-items: center; gap: 0.75rem;">
-									<div style="width: 34px; height: 34px; border-radius: 9999px; background: #0e2331; color: #fdc619; display: flex; align-items: center; justify-content: center; font-weight: 800; font-family: var(--font-title);">
+									<div
+										style="width: 34px; height: 34px; border-radius: 9999px; background: #0e2331; color: #fdc619; display: flex; align-items: center; justify-content: center; font-weight: 800; font-family: var(--font-title);"
+									>
 										{u.full_name[0]}
 									</div>
 									<div style="text-align: left;">
