@@ -369,6 +369,49 @@ export function hashPassword(password: string): string {
   return bcrypt.hashSync(password, 10);
 }
 
+export function getUserWithPassword(id: number): (User & { password: string }) | null {
+  const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as (User & { password: string }) | undefined;
+  return row || null;
+}
+
+export function updateUserPassword(userId: number, currentPass: string, newPass: string): { success: boolean; error?: string } {
+  const user = getUserWithPassword(userId);
+  if (!user) return { success: false, error: 'Utilisateur introuvable.' };
+
+  if (!verifyPassword(currentPass, user.password)) {
+    return { success: false, error: 'Le mot de passe actuel est incorrect.' };
+  }
+
+  if (newPass.length < 4) {
+    return { success: false, error: 'Le nouveau mot de passe doit comporter au moins 4 caractères.' };
+  }
+
+  const hashed = hashPassword(newPass);
+  db.prepare("UPDATE users SET password = ?, updated_at = datetime('now') WHERE id = ?").run(hashed, userId);
+  logAudit(userId, 'PASSWORD_CHANGED', 'user', userId, 'Modification du mot de passe');
+  return { success: true };
+}
+
+export function updateUserProfile(userId: number, data: { full_name: string; email: string; phone?: string }): { success: boolean; error?: string } {
+  if (!data.full_name?.trim() || !data.email?.trim()) {
+    return { success: false, error: 'Le nom et l\'email sont requis.' };
+  }
+
+  const existing = db.prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?) AND id != ?').get(data.email.trim(), userId);
+  if (existing) {
+    return { success: false, error: 'Cette adresse email est déjà utilisée.' };
+  }
+
+  db.prepare(`
+    UPDATE users
+    SET full_name = ?, email = ?, phone = ?, updated_at = datetime('now')
+    WHERE id = ?
+  `).run(data.full_name.trim(), data.email.trim(), data.phone?.trim() || '', userId);
+
+  logAudit(userId, 'USER_UPDATED', 'user', userId, `Mise à jour du profil de ${data.full_name}`);
+  return { success: true };
+}
+
 export function createSession(userId: number): string {
   const token = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days

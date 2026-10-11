@@ -135,6 +135,14 @@
 						<Share2 size={18} />
 						<span>Invitations</span>
 					</a>
+					<a
+						href="/profil"
+						class="desktop-nav-link"
+						class:active={$page.url.pathname === '/profil'}
+					>
+						<KeyRound size={18} />
+						<span>Profil & Sécurité</span>
+					</a>
 				</nav>
 
 				<div class="header-actions">
@@ -144,8 +152,18 @@
 						title="Inviter un ami"
 					>
 						<Share2 size={15} />
-						<span class="btn-label-desktop">Inviter</span>
+						<span>+ Inviter un ami</span>
 					</button>
+
+					<a
+						href="/profil"
+						class="btn btn-outline btn-sm"
+						style="border-color: #cbd5e1; gap: 0.35rem;"
+						title="Mon profil & Modifier mot de passe"
+					>
+						<KeyRound size={15} color="#0e2331" />
+						<span class="btn-label-desktop">Mon compte</span>
+					</a>
 
 					<!-- Quick User Switcher button (ideal for testing multi-user workflow) -->
 					<button
@@ -155,7 +173,7 @@
 						title="Changer d'utilisateur (Test multi-comptes)"
 					>
 						<UserCheck size={16} color="#0e2331" />
-						<span style="max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+						<span style="max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
 							{data.user.full_name.split(' ')[0]}
 						</span>
 					</button>
@@ -203,20 +221,20 @@
 				<span style="font-size: 0.7rem; font-weight: 800;">Ajouter</span>
 			</a>
 			<a
-				href="/historique"
+				href="/invitations"
 				class="nav-item"
-				class:active={$page.url.pathname === '/historique'}
+				class:active={$page.url.pathname === '/invitations'}
 			>
-				<History size={22} class="nav-icon" />
-				<span>Historique</span>
+				<Share2 size={22} class="nav-icon" />
+				<span>Inviter</span>
 			</a>
 			<a
-				href="/amis"
+				href="/profil"
 				class="nav-item"
-				class:active={$page.url.pathname === '/amis'}
+				class:active={$page.url.pathname === '/profil'}
 			>
-				<Users size={22} class="nav-icon" />
-				<span>Amis</span>
+				<KeyRound size={22} class="nav-icon" />
+				<span>Profil</span>
 			</a>
 		</nav>
 	{/if}
