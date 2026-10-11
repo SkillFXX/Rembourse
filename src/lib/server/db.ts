@@ -96,7 +96,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS invitations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT NOT NULL UNIQUE,
-    created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_by INTEGER DEFAULT NULL REFERENCES users(id) ON DELETE SET NULL,
     used_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     expires_at TEXT DEFAULT NULL,
@@ -255,6 +255,32 @@ function parseSqlValues(str: string): any[][] {
 }
 
 function initDefaultData() {
+  // Ensure schema compatibility for invitations.created_by
+  try {
+    const info = db.prepare("PRAGMA table_info(invitations)").all() as any[];
+    const col = info.find((c: any) => c.name === 'created_by');
+    if (col && col.notnull === 1) {
+      db.exec(`
+        PRAGMA foreign_keys = OFF;
+        CREATE TABLE IF NOT EXISTS invitations_temp (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          code TEXT NOT NULL UNIQUE,
+          created_by INTEGER DEFAULT NULL REFERENCES users(id) ON DELETE SET NULL,
+          used_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          expires_at TEXT DEFAULT NULL,
+          is_used INTEGER NOT NULL DEFAULT 0
+        );
+        INSERT OR IGNORE INTO invitations_temp SELECT id, code, CASE WHEN created_by = 0 THEN NULL ELSE created_by END, used_by, created_at, expires_at, is_used FROM invitations;
+        DROP TABLE invitations;
+        ALTER TABLE invitations_temp RENAME TO invitations;
+        PRAGMA foreign_keys = ON;
+      `);
+    }
+  } catch (err) {
+    // silent
+  }
+
   const catCount = db.prepare('SELECT COUNT(*) as count FROM categories').get() as { count: number };
   if (catCount.count === 0) {
     db.exec(`
@@ -276,9 +302,9 @@ function initDefaultData() {
     if (inviteCount.count === 0) {
       db.prepare(`
         INSERT INTO invitations (code, created_by, is_used)
-        VALUES ('INV-BIENVENUE', 0, 0)
+        VALUES ('INV-BIENVENUE', NULL, 0)
       `).run();
-      console.log('✨ Base de données initialisée : utilisez le code "INV-BIENVENUE" pour créer le premier compte.');
+      console.log('✨ Base de données initialisée : utilisez le code "INV-BIENVENUE" pour créer le premier compte administrateur.');
     }
   }
 }
@@ -492,9 +518,9 @@ export function createInvitation(userId: number): Invitation {
 
 export function getInvitation(code: string): Invitation | null {
   const row = db.prepare(`
-    SELECT i.*, u.full_name as creator_name
+    SELECT i.*, COALESCE(u.full_name, 'Système') as creator_name
     FROM invitations i
-    JOIN users u ON i.created_by = u.id
+    LEFT JOIN users u ON i.created_by = u.id
     WHERE UPPER(i.code) = UPPER(?)
   `).get(code) as Invitation | undefined;
   return row || null;
@@ -535,27 +561,34 @@ export function registerWithInvitation(data: {
   const hashedPassword = hashPassword(data.password);
 
   const result = db.transaction(() => {
+    // Determine role: the very first user is promoted to admin
+    const userCount = (db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number }).count;
+    const role = userCount === 0 ? 'admin' : 'user';
+
     const insertRes = db.prepare(`
       INSERT INTO users (username, email, password, full_name, role, is_active)
-      VALUES (?, ?, ?, ?, 'user', 1)
-    `).run(data.username.trim(), data.email.trim(), hashedPassword, data.full_name.trim());
+      VALUES (?, ?, ?, ?, ?, 1)
+    `).run(data.username.trim(), data.email.trim(), hashedPassword, data.full_name.trim(), role);
 
     const newUserId = insertRes.lastInsertRowid as number;
 
     // Mark invite used
     db.prepare('UPDATE invitations SET is_used = 1, used_by = ? WHERE id = ?').run(newUserId, invite.id);
 
-    // Audit log
+    // Audit log (actor is the inviter or the newly created user if system-generated)
+    const actorId = invite.created_by || newUserId;
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
       VALUES (?, 'USER_CREATED', 'user', ?, ?)
-    `).run(invite.created_by, newUserId, `Inscription de ${data.full_name} via invitation ${data.inviteCode}`);
+    `).run(actorId, newUserId, `Inscription de ${data.full_name} via invitation ${data.inviteCode}`);
 
-    // Notify inviter
-    db.prepare(`
-      INSERT INTO notifications (user_id, type, title, message, link)
-      VALUES (?, 'USER_JOINED', 'Nouvel ami inscrit !', ?, '/amis')
-    `).run(invite.created_by, `${data.full_name} a rejoint Rembourse grâce à votre invitation.`);
+    // Notify inviter if exists
+    if (invite.created_by) {
+      db.prepare(`
+        INSERT INTO notifications (user_id, type, title, message, link)
+        VALUES (?, 'USER_JOINED', 'Nouvel ami inscrit !', ?, '/amis')
+      `).run(invite.created_by, `${data.full_name} a rejoint Rembourse grâce à votre invitation.`);
+    }
 
     return getUserById(newUserId);
   })();
