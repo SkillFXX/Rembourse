@@ -11,7 +11,8 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"migrate": "node scripts/migrate.cjs",
 		"cap:sync": "npx cap sync",
-		"cap:open": "npx cap open android"
+		"cap:open": "npx cap open android",
+		"build:apk": "npm run build && npx cap sync && powershell -Command \"Set-Location android; .\\gradlew.bat assembleDebug\""
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^8.0.0",
