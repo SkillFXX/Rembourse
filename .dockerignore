@@ -1,0 +1,8 @@
+node_modules
+.svelte-kit
+build
+android
+data/*.db*
+.git
+.vscode
+npm-debug.log*
