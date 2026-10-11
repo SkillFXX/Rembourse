@@ -1,36 +1,34 @@
 # 💸 Rembourse
 
-Application moderne de gestion des avances d'argent, dettes et remboursements entre amis, conçue avec **SvelteKit**, **SQLite** et **Capacitor**.
+Application **PWA (Progressive Web App)** moderne pour gérer les avances d'argent, dettes et remboursements entre amis, conçue avec **SvelteKit**, **Svelte 5 (Runes)** et **SQLite**.
 
 ---
 
-## 🌟 Fonctionnalités Principales
+## 🌟 Fonctionnalités
 
 1. **Calcul des Soldes Nets et Bilatéraux**
-   - Dites le plus simplement possible : *"J'ai payé 8€ de Macdo à Quentin"* puis *"Quentin m'a remboursé 10€"* et voyez immédiatement que vous lui devez 2€ !
-   - Calcul automatique et instantané des équilibres financiers entre vous et chacun de vos amis.
+   - Dites le plus simplement possible : *"J'ai payé 8€ de repas pour un ami"* puis *"Il m'a remboursé 10€"* $\rightarrow$ l'application calcule instantanément que vous lui devez 2€ !
+   - Calcul automatique et transparent des équilibres financiers entre vous et chacun de vos amis.
 
 2. **Validation et Contestation Obligatoires**
    - Chaque nouvelle transaction (avance ou remboursement) doit **impérativement être validée** par le destinataire pour impacter les soldes officiels.
    - En cas de désaccord, l'utilisateur peut **contester la transaction avec un motif explicatif obligatoire** (ex : *"Je n'étais pas là"*, *"Déjà réglé en liquide"*).
-   - Historique complet des statuts : **Validée**, **En attente de validation**, **Contestée** (avec motif affiché).
+   - Historique complet avec filtres et statuts : **Validée**, **En attente de validation**, **Contestée** (avec motif affiché).
 
 3. **Système Privé sur Invitation Uniquement**
-   - Personne ne peut s'inscrire librement sans invitation.
-   - N'importe quel membre connecté peut générer un lien d'invitation unique (`/register?invite=INV-...`).
-   - Le lien identifie l'ami qui invite et préserve un cercle de confiance entre proches.
+   - Inscription réservée au cercle d'amis : aucun compte ne peut être créé sans code d'invitation valide.
+   - N'importe quel membre connecté peut générer un lien d'invitation unique (`/register?invite=INV-XXXX`) pour inviter un ami.
+   - Lors de la première installation vierge, le code d'invitation initial `INV-BIENVENUE` permet au premier utilisateur de créer le compte administrateur.
 
-4. **Multiplateforme & Notifications**
-   - **Web (PC & iPhone)** : Responsive design soigné, installable en PWA (manifest, icône, thème).
-   - **Android APK (Capacitor)** : Projet natif Android configuré dans `android/` avec `@capacitor/local-notifications` pour alerter les utilisateurs lorsqu'une transaction nécessite leur validation.
+4. **Progressive Web App (PWA) & Notifications Push Web**
+   - **Installable en 1 clic** sur Android, PC, Mac et iOS (Safari).
+   - Bannière d'installation native avec détection automatique du support PWA et guide pas à pas pour Safari iOS.
+   - **Notifications Push natives (VAPID)** : alertes en temps réel à chaque transaction en attente de validation ou contestée, avec configuration VAPID automatique côté serveur.
 
-5. **Données Historiques Importées (`old_data.sql`)**
-   - Migration automatique complète au démarrage des utilisateurs existants (Raphaël, Quentin, Tristan), des 8 catégories, des 13 dettes et des 6 paiements historiques.
-
-6. **Direction Artistique Respectée**
+5. **Direction Artistique**
    - **Font Titre** : `Lilita One`
    - **Font Texte** : `Nunito`
-   - **Logos** : `icon.png` (carré) et `text.png` / `texte.png` (typographique)
+   - **Logos** : `icon.png` (icône carrée / maskable) et `text.png` (typographique)
    - **Palette de couleurs** :
      - Fond clair : `#fcfdfc`
      - Jaune éclatant / Accent : `#fdc619`
@@ -38,46 +36,108 @@ Application moderne de gestion des avances d'argent, dettes et remboursements en
 
 ---
 
-## 🚀 Démarrage Rapide
+## 🚀 Démarrage en Développement Local
 
-### 1. Installation des dépendances
+### 1. Prérequis
+- **Node.js 22 LTS** ou supérieur
+- **npm**
+
+### 2. Installation
 ```bash
+# Installer les dépendances
 npm install
-```
 
-### 2. Migration de la base SQLite
-La base de données SQLite se trouve dans `data/rembourse.db`. Si elle n'existe pas, elle sera créée et initialisée automatiquement avec les données de `old_data.sql`. Vous pouvez aussi relancer la migration manuellement :
-```bash
-npm run migrate
-```
-
-### 3. Lancer le serveur de développement Web
-```bash
+# Démarrer le serveur de développement
 npm run dev
 ```
-Accédez à l'application sur [http://localhost:5173](http://localhost:5173).
 
-### 4. Comptes pré-configurés pour tester
-Pour faciliter les tests du système de validation entre amis, un **Accès Rapide Test & Démo** est disponible sur la page de connexion ainsi qu'un bouton de changement rapide d'utilisateur dans la barre de navigation :
-- **Raphaël Namur** (`admin`)
-- **Quentin Poupion** (`quentin` / mdp: `quentin`)
-- **Tristan Rousselle** (`tristan`)
+L'application est accessible sur [http://localhost:5173](http://localhost:5173).
 
 ---
 
-## 📱 Build & Export Mobile Android (Capacitor)
+## 🛠️ Production & Déploiement
 
-1. Compiler l'application web :
+### Compilation locale
+```bash
+npm run build
+node build/index.js
+```
+L'application écoute par défaut sur le port `3000` (`http://localhost:3000`).
+
+---
+
+## 🐧 Déploiement sur Conteneur Proxmox (LXC / CTX)
+
+### Option 1 — Déploiement automatisé avec GitHub Runner (Recommandé)
+
+Le projet intègre un workflow GitHub Actions ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)) qui compile et redéploie automatiquement l'application sur votre CTX à chaque `git push` sur la branche `master`.
+
+#### 1. Enregistrer le Runner sur votre CTX Proxmox :
+Sur GitHub : **Settings** $\rightarrow$ **Actions** $\rightarrow$ **Runners** $\rightarrow$ **New self-hosted runner** (Linux / x64).
+
+Dans le terminal de votre CTX :
+```bash
+mkdir -p /opt/actions-runner && cd /opt/actions-runner
+curl -o actions-runner-linux-x64.tar.gz -L https://github.com/actions/runner/releases/download/v2.322.0/actions-runner-linux-x64-2.322.0.tar.gz
+tar xzf ./actions-runner-linux-x64.tar.gz
+./config.sh --url https://github.com/<votre-user>/Rembourse --token <TOKEN_GITHUB>
+sudo ./svc.sh install
+sudo ./svc.sh start
+```
+
+Dès que vous poussez sur `master`, le runner compile l'application, synchronise les fichiers dans `/opt/rembourse` (en préservant la base SQLite dans `/opt/rembourse/data`), configure le service systemd et redémarre l'application.
+
+---
+
+### Option 2 — Déploiement manuel direct via Systemd
+
+1. **Installer Node.js 22 sur le CTX :**
    ```bash
+   apt update && apt install -y curl git build-essential python3
+   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+   apt install -y nodejs
+   ```
+
+2. **Cloner et compiler :**
+   ```bash
+   cd /opt
+   git clone <URL_REPO> rembourse
+   cd rembourse
+   npm ci
    npm run build
    ```
 
-2. Synchroniser avec le projet Android Capacitor :
+3. **Créer le service systemd :**
    ```bash
-   npm run cap:sync
+   cat << 'EOF' > /etc/systemd/system/rembourse.service
+   [Unit]
+   Description=Rembourse PWA Service
+   After=network.target
+
+   [Service]
+   Type=simple
+   User=root
+   WorkingDirectory=/opt/rembourse
+   ExecStart=/usr/bin/node build/index.js
+   Restart=always
+   RestartSec=5
+   Environment=NODE_ENV=production
+   Environment=PORT=3000
+   Environment=HOST=0.0.0.0
+
+   [Install]
+   WantedBy=multi-user.target
+   EOF
+
+   systemctl daemon-reload
+   systemctl enable --now rembourse
    ```
 
-3. Ouvrir le projet dans Android Studio pour générer l'APK :
-   ```bash
-   npm run cap:open
-   ```
+---
+
+## 🔒 Sécurité et Persistance des Données
+
+- **Base de données SQLite** : stockée dans `data/rembourse.db` avec mode WAL (*Write-Ahead Logging*).
+- **Mots de passe** : hachés avec `bcrypt`.
+- **Sessions sécurisées** : cookies HTTP-Only de 30 jours avec tokens cryptographiques aléatoires.
+- **Protection des données privées** : la base de données et les fichiers d'export `.sql` sont strictement ignorés par Git via `.gitignore`.

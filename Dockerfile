@@ -27,7 +27,6 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/build ./build
-COPY --from=builder /app/old_data.sql ./old_data.sql
 
 # Dossier pour la base SQLite persistante
 RUN mkdir -p /app/data

@@ -38,7 +38,6 @@ jobs:
           # 2. Copier les fichiers compilés et les dépendances
           cp -r build package*.json /opt/rembourse/
           cp -r node_modules /opt/rembourse/
-          [ -f old_data.sql ] && cp -n old_data.sql /opt/rembourse/ || true
 
           # 3. Créer ou mettre à jour le service systemd automatiquement
           cat << EOF > /etc/systemd/system/rembourse.service

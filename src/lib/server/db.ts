@@ -254,7 +254,37 @@ function parseSqlValues(str: string): any[][] {
   return rows;
 }
 
+function initDefaultData() {
+  const catCount = db.prepare('SELECT COUNT(*) as count FROM categories').get() as { count: number };
+  if (catCount.count === 0) {
+    db.exec(`
+      INSERT OR IGNORE INTO categories (id, name, icon, color) VALUES
+        (1, 'Restaurant & Fast-Food', 'utensils', '#f59e0b'),
+        (2, 'Courses & Alimentation', 'shopping-cart', '#10b981'),
+        (3, 'Sorties & Soirées', 'party-popper', '#8b5cf6'),
+        (4, 'Logement & Vacances', 'home', '#3b82f6'),
+        (5, 'Transports & Essence', 'car', '#06b6d4'),
+        (6, 'Loisirs & Activités', 'gamepad-2', '#ec4899'),
+        (7, 'Cadeaux', 'gift', '#eab308'),
+        (8, 'Autre', 'tag', '#64748b');
+    `);
+  }
+
+  const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
+  if (userCount.count === 0) {
+    const inviteCount = db.prepare('SELECT COUNT(*) as count FROM invitations').get() as { count: number };
+    if (inviteCount.count === 0) {
+      db.prepare(`
+        INSERT INTO invitations (code, created_by, is_used)
+        VALUES ('INV-BIENVENUE', 0, 0)
+      `).run();
+      console.log('✨ Base de données initialisée : utilisez le code "INV-BIENVENUE" pour créer le premier compte.');
+    }
+  }
+}
+
 checkAndMigrate();
+initDefaultData();
 
 // Types
 export interface User {
